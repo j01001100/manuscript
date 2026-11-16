@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Manuscript</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='7' fill='%231f5c5a'/><path d='M9 23V9l7 9 7-9v14' fill='none' stroke='%23fff' stroke-width='2.6' stroke-linecap='round' stroke-linejoin='round'/></svg>">
+<link rel="stylesheet" href="app.css">
+</head>
+<body>
+<div id="app" class="app">
+
+  <aside class="sidebar" id="sidebar">
+    <button class="book-head" id="bookHead" title="Book details">
+      <span class="book-title" id="bookTitle">Manuscript</span>
+      <span class="book-meta" id="bookMeta"></span>
+    </button>
+    <div class="goal" id="goal" title="Words written today">
+      <div class="goal-bar"><div class="goal-fill" id="goalFill"></div></div>
+      <span id="goalText"></span>
+    </div>
+    <div class="side-label">Chapters</div>
+    <ol class="chapters" id="chapters"></ol>
+    <button class="ghost add-chapter" id="addChapter">+ New chapter</button>
+    <div class="side-foot">
+      <button class="ghost" id="openOutline">Outline</button>
+      <button class="ghost" id="openBooks">Books</button>
+      <button class="ghost model" id="openModel" title="Model settings"><i class="dot" id="modelDot"></i><span id="modelName">model</span></button>
+    </div>
+  </aside>
+
+  <main class="desk" id="desk">
+    <div class="toolbar">
+      <button class="icon" id="toggleSidebar" title="Show or hide chapters">☰</button>
+      <span class="status" id="status"></span>
+      <span class="spacer"></span>
+      <button class="ghost" id="openFind" title="Find in this chapter or the whole book (Cmd+F)">Find</button>
+      <button class="ghost" id="readAloud" title="Hear the selection, or the chapter from the cursor">Read aloud</button>
+      <button class="ghost" id="openHistory" title="Earlier versions of this chapter">History</button>
+      <button class="ghost" id="toggleFocus" title="Hide everything but the page (Esc to leave)">Focus</button>
+      <button class="icon" id="toggleTheme" title="Light or dark">◐</button>
+      <button class="icon" id="toggleAssistant" title="Show or hide the editor panel">▤</button>
+    </div>
+    <div class="findbar" id="findBar" hidden>
+      <div class="find-row">
+        <input class="field" id="findInput" placeholder="Find" spellcheck="false" autocomplete="off">
+        <span class="find-count" id="findCount"></span>
+        <button class="icon" id="findPrev" title="Previous (Shift+Return)">↑</button>
+        <button class="icon" id="findNext" title="Next (Return)">↓</button>
+        <label class="find-all" title="Also list every match in the other chapters"><input type="checkbox" id="findAll"> Whole book</label>
+        <button class="icon" id="findClose" title="Close (Esc)">✕</button>
+      </div>
+      <div class="find-results" id="findResults" hidden></div>
+    </div>
+    <div class="page-wrap" id="pageWrap">
+      <div class="page">
+        <input class="chapter-title" id="chapterTitle" placeholder="Chapter title" spellcheck="false">
+        <div class="sheet"><div class="marks" id="marks"></div><textarea class="manuscript" id="editor" placeholder="Begin." spellcheck="true"></textarea></div>
+      </div>
+    </div>
+  </main>
+
+  <aside class="assistant" id="assistant">
+    <nav class="tabs" id="tabs">
+      <button data-tab="next" class="on">Next</button>
+      <button data-tab="revise">Revise</button>
+      <button data-tab="critique">Critique</button>
+      <button data-tab="check">Check</button>
+      <button data-tab="bible">Bible</button>
+      <button data-tab="chat">Ask</button>
+    </nav>
+
+    <section class="panel on" data-panel="next">
+      <p class="hint" id="nextWhere"></p>
+      <input class="field" id="nextSteer" placeholder="Steer it, if you like: “she shouldn't find out yet”">
+      <div class="row">
+        <button class="primary" id="nextSuggest">Suggest what comes next</button>
+        <button class="ghost" id="nextDraft" title="A rough draft of the next ~150 words, in your voice">Draft a few lines</button>
+      </div>
+      <div class="out" id="nextOut"></div>
+    </section>
+
+    <section class="panel" data-panel="revise">
+      <p class="hint" id="reviseWhat">Select a passage in the manuscript, or leave the cursor in a paragraph.</p>
+      <blockquote class="excerpt" id="reviseExcerpt" hidden></blockquote>
+      <div class="chips" id="reviseModes">
+        <button data-mode="line" class="on" title="Clarity and rhythm, same length">Line edit</button>
+        <button data-mode="tighten" title="Cut what it doesn't need">Tighten</button>
+        <button data-mode="vivid" title="Replace telling with the exact detail">Make concrete</button>
+        <button data-mode="dialogue" title="Subtext, voice, tags">Dialogue</button>
+        <button data-mode="copy" title="Spelling, grammar, punctuation only">Copyedit</button>
+      </div>
+      <input class="field" id="reviseInstruction" placeholder="Or say what you want: “less sentimental”, “slow this down”">
+      <div class="row"><button class="primary" id="reviseRun">Revise</button></div>
+      <div class="out" id="reviseOut"></div>
+    </section>
+
+    <section class="panel" data-panel="critique">
+      <p class="hint">An honest read of this chapter, or of the passage you have selected.</p>
+      <div class="chips" id="critiqueLens">
+        <button data-lens="developmental" class="on" title="Stakes, structure, what the chapter does for the book">Developmental</button>
+        <button data-lens="line" title="The prose, sentence by sentence">Line</button>
+        <button data-lens="juror" title="A cold read by someone with two hundred other books on the desk">Prize juror</button>
+        <button data-lens="reader" title="Where a first-time reader leans in, drifts, or is lost">First reader</button>
+      </div>
+      <div class="row"><button class="primary" id="critiqueRun">Read it</button><span class="hint inline" id="critiqueScope"></span></div>
+      <div class="out" id="critiqueOut"></div>
+    </section>
+
+    <section class="panel" data-panel="check">
+      <div class="row between">
+        <p class="hint" id="diagScope">Prose diagnostics: instant, no model.</p>
+        <button class="ghost" id="diagRun">Refresh</button>
+      </div>
+      <div id="diagOut"></div>
+      <div class="rule"></div>
+      <p class="hint">Continuity: compares this chapter with the story bible and everything before it.</p>
+      <div class="row"><button class="primary" id="continuityRun">Check continuity</button></div>
+      <div class="out" id="continuityOut"></div>
+    </section>
+
+    <section class="panel" data-panel="bible">
+      <p class="hint">People, places and open threads. Only the entries a passage touches are sent to the model.</p>
+      <div class="row">
+        <button class="primary" id="bibleExtract">Update from this chapter</button>
+        <button class="ghost" id="bibleAdd">+ Add entry</button>
+      </div>
+      <div class="out" id="bibleProposals"></div>
+      <div id="bibleList"></div>
+    </section>
+
+    <section class="panel chat" data-panel="chat">
+      <div class="chat-log" id="chatLog">
+        <p class="hint">Ask anything about the book: “Has this character's age been consistent?”, “What does this chapter still owe the reader?”</p>
+      </div>
+      <form class="chat-form" id="chatForm">
+        <textarea class="field" id="chatInput" rows="2" placeholder="Ask your editor…"></textarea>
+        <button class="primary" id="chatSend">Ask</button>
+      </form>
+    </section>
+  </aside>
+</div>
+
+<div class="modal-back" id="modalBack" hidden><div class="modal" id="modal"></div></div>
+<div class="toast" id="toast" hidden></div>
+
+<script src="diagnostics.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

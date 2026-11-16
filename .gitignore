@@ -1,0 +1,11 @@
+# Your writing and your settings stay out of the code's history.
+books/
+config.json
+
+# Build output (rebuild with ./macos/build.sh)
+Manuscript.app/
+
+# Local tooling
+.claude/
+
+.DS_Store

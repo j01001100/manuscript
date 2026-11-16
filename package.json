@@ -1,0 +1,18 @@
+{
+  "name": "manuscript",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A local writing desk for a book, with your own model as the editor.",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test test/*.test.js"
+  },
+  "engines": {
+    "node": ">=20.15"
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/j01001100/manuscript.git"
+  }
+}
