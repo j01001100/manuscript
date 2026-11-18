@@ -29,7 +29,9 @@ const sse = (res, events) => { res.writeHead(200, { 'Content-Type': 'text/event-
 
 test('settings are written for your eyes only and the address is tidied', () => {
   const cfg = llm.setConfig({ endpoint: 'http://127.0.0.1:1/v1///', model: ' m ', apiKey: 'secret', nonsense: 'ignored' });
-  assert.deepEqual(cfg, { endpoint: 'http://127.0.0.1:1/v1', model: 'm', apiKey: 'secret' });
+  assert.deepEqual(cfg, { endpoint: 'http://127.0.0.1:1/v1', model: 'm', apiKey: 'secret', contextWindow: '' });
+  assert.equal(llm.setConfig({ contextWindow: '65,536' }).contextWindow, 65536);
+  assert.equal(llm.setConfig({ contextWindow: 'auto' }).contextWindow, '', 'anything that is not a size means: ask the server');
   assert.equal(fs.statSync(process.env.MANUSCRIPT_CONFIG).mode & 0o777, 0o600);
 });
 
@@ -48,6 +50,19 @@ test('a strict server that rejects the extra parameters is retried without them,
     assert.equal(model.seen.length, 4, 'the second request goes straight through');
     assert.ok(!('reasoning_effort' in model.seen[3].body) && !('response_format' in model.seen[3].body));
   } finally { await model.close(); }
+});
+
+test('a prompt refused as too long does not switch off the optional parameters', async () => {
+  const model = await fakeModel((body, res) => { res.writeHead(400, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: { message: "This model's maximum context length is 8192 tokens." } })); });
+  try {
+    await assert.rejects(llm.complete({ messages: [], effort: 'low' }), (e) => e.status === 400 && /maximum context length/.test(e.detail));
+    assert.equal(model.seen.length, 1, 'not retried as a parameter problem');
+  } finally { await model.close(); }
+  const again = await fakeModel((body, res) => ok(res, 'fine'));
+  try {
+    await llm.complete({ messages: [], effort: 'low' });
+    assert.equal(again.seen[0].body.reasoning_effort, 'low');
+  } finally { await again.close(); }
 });
 
 test('other errors are reported, not retried', async () => {

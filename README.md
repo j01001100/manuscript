@@ -19,22 +19,22 @@ Around that: find in the chapter or across the whole book, an outline of what th
 
 The editor is instructed to protect your voice, quote your own lines back to you, and skip the flattery. It is a tool for a writer, not a ghostwriter.
 
-### It does not read the whole book every time
+### How much the model reads
 
-Sending an entire manuscript to a local model on every request is slow and wasteful. Working in chapter 5, the model reads:
+Manuscript asks your model server how large its context window is (how much it can read at once) and budgets every request against it, so the same rules suit an 8K model and a 128K one, and no request is ever too long for the model. Splash, vLLM, llama.cpp and LM Studio report their size; with Ollama, or a server that does not say, enter it in **Model settings**. If a server refuses a prompt as too long anyway, Manuscript learns the real size from the refusal, trims, and retries on its own.
 
-| | |
+Working in chapter 5:
+
+| Tool | Reads |
 |---|---|
-| Chapter 5 and chapter 4 | in full |
-| Chapters 1–3 | a ~200-word summary each (one line each once they are more than six chapters back) |
-| Story bible | only the entries the passage mentions |
+| Next, Draft, Revise, Critique, Bible | chapters 5 and 4 in full, and a ~200-word summary of each of chapters 1–3 |
+| Ask, Continuity | every earlier chapter in full, if the whole book so far fits in the window; otherwise the summaries, plus the chapters the model picks to re-read |
 
-It reaches further back only when there is a reason:
+On top of that, a name on the page that has not appeared since an earlier chapter pulls in the passages where it was introduced and last seen (a plain text search, no model call), and story-bible entries are included for whatever the passage mentions.
 
-- A name on the page that has not appeared since an earlier chapter pulls in the passages where it was introduced and last seen. This is a plain text search and costs nothing.
-- For **Ask** and **Check continuity**, the model is shown the summaries first and decides whether it needs to re-read an earlier chapter in full (two at most).
+Order matters as much as size. Model servers keep a cache of the prompt they last read and only process what changed after the first difference, so every prompt runs from what changes least (the book, earlier chapters) to what changes most (the chapter you are writing, then anything specific to this request). While you write chapter 5, only chapter 5 is re-read; the rest comes from the cache. In Ask, material chosen for one question travels with that question, so follow-ups keep the cache too.
 
-Summaries are written in the background shortly after you stop working on a chapter, and reused until that chapter changes. Under every answer, a "Read ≈N tokens" line lists exactly what was sent. The limits are the `BUDGET` numbers at the top of [`lib/context.js`](lib/context.js).
+With a 128K window, the most each tool may read is about 65K tokens for the writing tools and about 105K for Ask and Continuity; Revise takes up to 3,000 words at once. These are ceilings, not targets: a typical request reads a fraction of that. Model settings shows the detected size, where it came from, a **Check again** button for when you restart your server with a different size, and the budget for each tool. Under every answer, "Read ≈N tokens" lists exactly what was sent and how much of it the model served from its cache.
 
 ## What you need
 

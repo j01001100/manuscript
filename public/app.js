@@ -149,12 +149,15 @@ async function runAI(key, url, body, on = {}) {
   }
 }
 
+const kTokens = (n) => (n >= 1024 && n % 1024 === 0 ? `${n / 1024}K` : n >= 10000 ? `${Math.round(n / 1000)}K` : fmt(n));
+
 function receiptHTML(r, usage) {
   if (!r) return '';
   const rows = r.items.map((i) => `<tr class="${i.recalled ? 'recalled' : ''}"><td>${h(i.label)}</td><td>${h(i.how)}</td><td>${fmt(i.tokens)}</td></tr>`).join('');
   const whole = r.bookTokens > r.tokens * 1.3 ? `, instead of ≈${fmt(r.bookTokens)} for the whole book` : '';
-  const cached = usage?.cached ? `<tr><td colspan="3">${fmt(usage.cached)} of those tokens were reused from the model's cache.</td></tr>` : '';
-  return `<details class="receipt"><summary>Read ≈${fmt(r.tokens)} tokens${whole}: ${h(r.items.map((i) => i.label).join(', '))} ▾</summary><table>${rows}${cached}</table></details>`;
+  const share = r.window ? ` (${Math.max(1, Math.round((r.tokens / r.window) * 100))}% of the ${kTokens(r.window)} window)` : '';
+  const real = usage?.prompt ? `<tr><td colspan="3">The model counted ${fmt(usage.prompt)} tokens${usage.cached ? `, ${fmt(usage.cached)} of them reused from its cache, so only ${fmt(usage.prompt - usage.cached)} had to be read` : ''}.</td></tr>` : '';
+  return `<details class="receipt"><summary>Read ≈${fmt(r.tokens)} tokens${share}${whole}: ${h(r.items.map((i) => i.label).join(', '))} ▾</summary><table>${rows}${real}</table></details>`;
 }
 
 // A result card with a live status line, a Stop button, and a receipt of what was read.
@@ -778,22 +781,48 @@ async function historyModal() {
   };
 }
 
+const TOOL_NAMES = { next: 'Next', continue: 'Draft a few lines', revise: 'Revise', critique: 'Critique', bible: 'Bible', chat: 'Ask', continuity: 'Continuity' };
+
+function windowHTML(w) {
+  const rows = Object.entries(w.budgets).map(([task, b]) => `<tr><td>${TOOL_NAMES[task] || task}</td><td>${kTokens(b.reads)}</td></tr>`).join('');
+  return `<div class="window-box">
+    <div class="window-head"><b>${fmt(w.tokens)} tokens</b> <span class="hint inline">${h(w.source)}</span>
+      <button class="ghost" data-check title="Ask the model server again, e.g. after restarting it with a different size">Check again</button></div>
+    ${w.guess ? '<p class="warn">The server did not say how much it can read, so this is a cautious guess. If you know the size, enter it below.</p>' : ''}
+    <details><summary class="hint">How much each tool may read</summary>
+      <table class="budgets">${rows}</table>
+      <p class="hint">These are ceilings, not targets: each tool sends only what it needs. Ask and Continuity read every earlier chapter in full when the book fits; the other tools read the previous chapter in full and summaries of the rest. Revise takes up to ${fmt(w.reviseWords)} words at once.</p>
+    </details></div>`;
+}
+
 async function modelModal() {
-  const [cfg, health] = await Promise.all([api('GET', '/config'), api('GET', '/health')]);
+  const [cfg, health, w] = await Promise.all([api('GET', '/config'), api('GET', '/health'), api('GET', '/window').catch(() => null)]);
   const m = openModal(`<h2>Model</h2><p class="sub">${health.ok ? `Connected to <b>${h(health.model)}</b>.` : h(health.error || 'Not connected.')} Everything runs on this computer; nothing you write leaves it.</p>
     <label>Server address <small>any OpenAI-compatible endpoint</small></label><input class="field" name="endpoint" value="${h(cfg.endpoint)}">
     <label>Model name</label><input class="field" name="model" value="${h(cfg.model)}" list="modelList">
     <datalist id="modelList">${(health.models || []).map((id) => `<option value="${h(id)}">`).join('')}</datalist>
     <label>API key <small>only if your server asks for one</small></label><input class="field" name="apiKey" type="password" value="${h(cfg.apiKey || '')}" autocomplete="off">
+    <label>Context window <small>how much the model can read at once</small></label>
+    <div data-window>${w && health.ok ? windowHTML(w) : '<p class="hint">Shown once the model is connected.</p>'}</div>
+    <label>Use a different size <small>tokens; leave empty to use what the server reports</small></label>
+    <input class="field" name="contextWindow" inputmode="numeric" placeholder="${w ? fmt(w.detected) : 'detected automatically'}" value="${h(cfg.contextWindow || '')}" style="width:220px">
     <div class="foot"><button class="ghost" data-x>Cancel</button><button class="primary" data-ok>Save</button></div>`);
   $('[data-x]', m).onclick = closeModal;
+  const box = $('[data-window]', m);
+  box.onclick = async (e) => {
+    const btn = e.target.closest('[data-check]');
+    if (!btn) return;
+    btn.disabled = true;
+    btn.textContent = 'Checking…';
+    try { box.innerHTML = windowHTML(await api('POST', '/window/check')); checkHealth(); } catch (err) { toast(err.message); btn.disabled = false; btn.textContent = 'Check again'; }
+  };
   $('[data-ok]', m).onclick = async () => { showHealth(await api('PUT', '/config', formData(m))); closeModal(); };
 }
 
 function showHealth(hl) {
   $('#modelDot').className = `dot ${hl.ok ? 'ok' : 'bad'}`;
   $('#modelName').textContent = hl.ok ? hl.model : 'model offline';
-  $('#openModel').title = hl.ok ? `${hl.model} at ${hl.endpoint}` : hl.error || 'Model offline';
+  $('#openModel').title = hl.ok ? `${hl.model} at ${hl.endpoint}${hl.window ? ` · reads up to ${fmt(hl.window)} tokens` : ''}` : hl.error || 'Model offline';
 }
 const checkHealth = () => api('GET', '/health').then(showHealth).catch(() => showHealth({ ok: false }));
 

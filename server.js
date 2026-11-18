@@ -12,6 +12,8 @@ const store = require('./lib/store');
 const llm = require('./lib/llm');
 const context = require('./lib/context');
 const assistant = require('./lib/assistant');
+const win = require('./lib/window');
+const P = require('./lib/prompts');
 const exporter = require('./lib/export');
 
 const PORT = Number(process.env.PORT) || 4747;
@@ -54,9 +56,11 @@ async function sse(req, res, work) {
 }
 
 const routes = [
-  ['GET', /^\/api\/health$/, async () => llm.health()],
-  ['GET', /^\/api\/config$/, async () => llm.getConfig()],
-  ['PUT', /^\/api\/config$/, async (m, body) => { llm.setConfig(body); return llm.health(); }],
+  ['GET', /^\/api\/health$/, async () => withWindow(await llm.health())],
+  ['GET', /^\/api\/config$/, async () => { const { calibration, ...cfg } = llm.getConfig(); return cfg; }],
+  ['PUT', /^\/api\/config$/, async (m, body) => { llm.setConfig(body); win.reset(); return withWindow(await llm.health()); }],
+  ['GET', /^\/api\/window$/, async () => windowReport()],
+  ['POST', /^\/api\/window\/check$/, async () => windowReport(true)],
 
   ['GET', /^\/api\/books$/, async () => store.listBooks()],
   ['POST', /^\/api\/books$/, async (m, body) => store.createBook(body)],
@@ -92,6 +96,24 @@ const routes = [
   })],
   ['GET', /^\/api\/books\/([^/]+)\/chapters\/([^/]+)\/snapshots\/([^/]+)$/, async (m) => ({ text: store.readSnapshot(m[1], m[2], decodeURIComponent(m[3])) })],
 ];
+
+// The context window and what each tool may read from it.
+async function windowReport(refresh = false) {
+  const w = await win.current({ refresh });
+  const budgets = {};
+  for (const task of Object.keys(context.TASKS)) {
+    let spec = P.TASKS[task]({ passage: 'x'.repeat(4000) });
+    if (w.tokens < 32768 && spec.effort === 'medium') spec = { ...spec, effort: 'low' };
+    const pl = context.plan(task, w.tokens, llm.allowance(spec, w.tokens));
+    budgets[task] = { reads: pl.total, writes: pl.reserve };
+  }
+  return { ...w, budgets, reviseWords: assistant.maxReviseWords(w.tokens) };
+}
+async function withWindow(h) {
+  if (!h.ok) return h;
+  const w = await win.current();
+  return { ...h, window: w.tokens, windowSource: w.source, windowGuess: w.guess };
+}
 
 async function handle(req, res) {
   const url = new URL(req.url, `http://${req.headers.host}`);

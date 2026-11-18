@@ -14,6 +14,7 @@ const until = async (fn, ms = 3000) => { const end = Date.now() + ms; while (!fn
 let requests = [];
 let delay = 40;
 const server = http.createServer((req, res) => {
+  if (req.method === 'GET') { res.writeHead(200, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify({ data: [{ id: 'fake', context_length: 32768 }] })); }
   let raw = '';
   req.on('data', (c) => { raw += c; });
   req.on('end', () => {
